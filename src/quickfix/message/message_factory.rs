@@ -20,18 +20,18 @@ impl MessageFactoryTrait for MessageFcactory44 {
         let mut message = Message::new(String::from("FIX.4.4"));
         let field8 = Field::new(FieldKey::begin_string(), String::from("FIX.4.4"));
         message.add_header(field8);
-        let field9 = Field::new(FieldKey::msg_type(), msgType);
-        message.add_header(field9);
+        let field35 = Field::new(FieldKey::msg_type(), msgType);
+        message.add_header(field35);
 
         let mut length = 0;
-        // &field_key::begin_string;
-        for field in &message.header.fields {
-            // if field.0 != 3 {
-            // }
-            // println!("{:?}", i);
+
+        for (key, value) in &message.header.fields {
+            if *key != FieldKey::begin_string() && *key != FieldKey::body_length() {
+                length += value.length();
+            }
         }
-        // let field9 = Field::new(9, length.to_string());
-        // message.add_header(field9);
+        let field9 = Field::new(FieldKey::body_length(), length.to_string());
+        message.add_header(field9);
 
         message
     }
