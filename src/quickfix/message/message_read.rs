@@ -8,8 +8,7 @@ use std::collections::HashMap;
 use crate::quickfix::message::message::Message;
 
 
-pub fn res_read(tcp_stream: &TcpStream) -> Message {
-    let mut reader = BufReader::new(tcp_stream);
+pub fn res_read(mut reader: BufReader<&TcpStream>) -> Message {
     let mut vec: Vec<Field> = Vec::new();
     let mut length:i32 = -1;
     let mut current_length:i32 = 0;

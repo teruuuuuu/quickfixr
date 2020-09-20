@@ -74,7 +74,7 @@ impl Message {
 
 #[test]
 fn test_message() {
-    let mut a = Header::new();
+    let mut a = Message::new();
     let field9 = Field::new(FieldKey::msg_type(), String::from("A"));
     let field8 = Field::new(
         FieldKey::body_length(),
