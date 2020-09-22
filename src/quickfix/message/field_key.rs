@@ -57,6 +57,9 @@ impl FieldKey {
     pub fn heart_beat_interval() -> FieldKey {
         FieldKey(108)
     }
+    pub fn reset_seq_num_flag() -> FieldKey {
+        FieldKey(141)
+    }
     pub fn checksum() -> FieldKey {
         FieldKey(10)
     }

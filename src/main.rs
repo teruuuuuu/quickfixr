@@ -1,13 +1,20 @@
-use quickfixr::quickfix::message::message_factory::MessageFactory;
-use quickfixr::quickfix::message::message_fix44::{create_factory44, logon_message, order_message};
-use quickfixr::quickfix::session::Session;
-use quickfixr::quickfix::{main3, main4, main5};
-use std::borrow::Borrow;
+use env_logger as logger;
+use quickfixr::quickfix::application::Controller;
+use quickfixr::quickfix::message::message::Message;
+use std::env;
+use std::sync::mpsc::Sender;
 
 fn main() {
-    // let mut session = Session::new(String::from("127.0.0.1"), String::from("9880"),
-    //                                create_factory44());
-    // session.start();
+    env::set_var("RUST_LOG", "debug");
+    env::set_var("RUST_BACKTRACE", "1");
+    logger::init();
+    let mut controller = Controller::new(String::from("127.0.0.1"), String::from("9880"));
+    controller.start(sends);
+}
 
-    main5::main();
+fn sends(_: Sender<Message>) {
+    loop {
+        let mut s = String::new();
+        std::io::stdin().read_line(&mut s).ok();
+    }
 }

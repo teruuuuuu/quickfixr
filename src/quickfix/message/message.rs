@@ -1,11 +1,14 @@
 use super::field::Field;
-use std::collections::HashMap;
 use crate::quickfix::message::field_key::FieldKey;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Message {
     pub fields: HashMap<FieldKey, Field>,
 }
+
+unsafe impl Send for Message {}
+unsafe impl Sync for Message {}
 
 impl Message {
     pub fn new() -> Message {
@@ -26,7 +29,7 @@ impl Message {
 
     pub fn debug(&self) {
         for field in self.get_fields() {
-            println!("{:?}: {:?}", field.tag.to_string(), field.data);
+            println!("{:?}:{:?}", field.tag.to_string(), field.data);
         }
     }
 
@@ -49,7 +52,7 @@ impl Message {
                 FieldKey::body_length(),
                 ((result2.len() + msgtype.len()) as i32).to_string(),
             )
-                .to_string(),
+            .to_string(),
         );
         result.push_str(&msgtype);
         result.push_str(&result2);
@@ -63,12 +66,32 @@ impl Message {
         result
     }
 
+    pub fn to_debug_string(&self) -> String {
+        let sender = match self.fields.get(&FieldKey::sender_cmp_id()) {
+            Option::Some(v) => v.data.to_string(),
+            _ => "".to_string(),
+        };
+        let target = match self.fields.get(&FieldKey::target_cmp_id()) {
+            Option::Some(v) => v.data.to_string(),
+            _ => "".to_string(),
+        };
+        format!("{}=>{}: {}", sender, target, self.to_request_string())
+    }
+
+    pub fn get_msg_type(&self) -> Option<&Field> {
+        self.fields.get(&FieldKey::msg_type())
+    }
+
     pub fn to_string(&self) -> String {
         let mut result = String::from("");
         for field in self.get_fields() {
             result.push_str(&field.to_string());
         }
         result
+    }
+
+    pub fn get(&self, field_key: FieldKey) -> Option<&Field> {
+        self.fields.get(&field_key)
     }
 }
 
@@ -85,4 +108,3 @@ fn test_message() {
     println!("{:?}", a.get_fields());
     println!("{:?}", a.to_string());
 }
-

@@ -1,26 +1,22 @@
+use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
-use std::io::{BufReader, BufRead};
 use std::{env, str};
 
 use crate::quickfix::message::field::Field;
 use crate::quickfix::message::field_key::FieldKey;
-use std::collections::HashMap;
 use crate::quickfix::message::message::Message;
-
+use std::collections::HashMap;
 
 pub fn res_read(mut reader: BufReader<&TcpStream>) -> Message {
     let mut vec: Vec<Field> = Vec::new();
-    let mut length:i32 = -1;
-    let mut current_length:i32 = 0;
+    let mut length: i32 = -1;
+    let mut current_length: i32 = 0;
     let mut checksum: i32 = 0;
 
     let mut debug_string = String::new();
 
-
-
     fn to_field(buf_read: &str) -> Field {
-        let str = buf_read
-            .replace(&String::from_utf8(vec![1]).unwrap(), "");
+        let str = buf_read.replace(&String::from_utf8(vec![1]).unwrap(), "");
 
         let key_val: Vec<&str> = str.split('=').collect();
         let key: String = key_val[0].parse().unwrap();
@@ -44,8 +40,7 @@ pub fn res_read(mut reader: BufReader<&TcpStream>) -> Message {
         debug_string = format!("{}{}", debug_string, buf_read);
         let field = to_field(&buf_read);
 
-        if !field.tag.eq(&FieldKey::begin_string())
-            && !field.tag.eq(&FieldKey::body_length()) {
+        if !field.tag.eq(&FieldKey::begin_string()) && !field.tag.eq(&FieldKey::body_length()) {
             current_length += buffer.len() as i32;
         }
         if field.tag.eq(&FieldKey::body_length()) {
@@ -68,9 +63,7 @@ pub fn res_read(mut reader: BufReader<&TcpStream>) -> Message {
         debug_string = format!("{}{}", debug_string, buf_read);
         let field = to_field(&buf_read);
 
-
-        if field.tag.eq(&FieldKey::checksum())
-            && field.data.parse::<i32>().unwrap() != checksum {
+        if field.tag.eq(&FieldKey::checksum()) && field.data.parse::<i32>().unwrap() != checksum {
             println!("checksum invalid")
         }
         vec.push(field);
@@ -81,7 +74,7 @@ pub fn res_read(mut reader: BufReader<&TcpStream>) -> Message {
         ret.add(field);
     }
 
-    println!("response: {:?}", debug_string);
+    // println!("response: {:?}", debug_string);
     ret
 }
 
