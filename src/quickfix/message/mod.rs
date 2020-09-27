@@ -3,5 +3,5 @@ pub mod field_key;
 pub mod message;
 pub mod message_factory;
 pub mod message_fix44;
-pub mod message_read;
+pub mod message_reader;
 pub mod msg_type;

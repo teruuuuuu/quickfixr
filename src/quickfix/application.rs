@@ -1,21 +1,20 @@
 use crate::quickfix::message::message::Message;
-use crate::quickfix::session::{OnMessage, Session};
 
 use crate::quickfix::message::field::Field;
-use crate::quickfix::message::field_key::FieldKey;
+use crate::quickfix::message::field_key::{MSG_SEQ_NUM, SENDER_CMP_ID, TARGET_CMP_ID};
 use crate::quickfix::message::message_fix44::{heart_beat_message, logon_message};
-use crate::quickfix::message::message_read;
+use crate::quickfix::message::message_reader;
 use async_std::sync::Arc;
 use env_logger as logger;
 use log::{debug, error, info, warn};
 use std::io::{BufRead, BufReader, Write};
-use std::net::TcpStream;
-use std::str;
+use std::net::{Shutdown, TcpStream};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use std::{process, str};
 pub struct Controller {
     host: String,
     port: String,
@@ -33,7 +32,7 @@ impl Controller {
 
     fn init_app(&mut self) -> Arc<Mutex<Application>> {
         info!("init stream start");
-        let mut tcp_stream = TcpStream::connect_timeout(
+        let tcp_stream = TcpStream::connect_timeout(
             &format!("{}:{}", self.host, self.port).parse().unwrap(),
             Duration::from_secs(1),
         )
@@ -42,7 +41,7 @@ impl Controller {
 
         info!("init app start");
         let heart_beat_interval = 10;
-        let mut app = Arc::new(Mutex::new(Application::new(
+        let app = Arc::new(Mutex::new(Application::new(
             tcp_stream,
             "BANZAI".to_string(),
             "EXEC".to_string(),
@@ -55,22 +54,32 @@ impl Controller {
 
     pub fn start(&mut self, f: fn(Sender<Message>)) {
         info!("start");
-        let mut app = self.init_app();
-        let mut tcp_stream = app.lock().unwrap().stream_clone();
+        let app = self.init_app();
+        let tcp_stream = app.lock().unwrap().stream_clone();
+        let (end_tx, end_rx) = mpsc::channel::<bool>();
+        let read_handler = self.read(tcp_stream, Arc::clone(&app), end_tx);
         let (tx, rx) = mpsc::channel::<Message>();
-        let mut read_handler = self.read(tcp_stream, Arc::clone(&app));
-        let mut send_handler_tx = self.send_tx(tx.clone(), f);
-        let mut send_handler_rx = self.send_rx(Arc::clone(&app), rx);
-        let mut heart_beat_handler =
+        let send_handler_tx = self.send_tx(tx.clone(), f);
+        let send_handler_rx = self.send_rx(Arc::clone(&app), rx);
+        let heart_beat_handler =
             self.send_heart_beat(app.lock().unwrap().heart_beat as u64, tx.clone());
-
-        app.lock().unwrap().start();
-        for handle in vec![
+        let end_handler = thread::spawn(move || {
+            let end = end_rx.recv();
+            if end.unwrap() {
+                info!("system end");
+                process::exit(0);
+            }
+        });
+        let workers = vec![
             read_handler,
             send_handler_tx,
             send_handler_rx,
             heart_beat_handler,
-        ] {
+            end_handler,
+        ];
+
+        app.lock().unwrap().start();
+        for handle in workers {
             handle.join().unwrap();
         }
     }
@@ -79,13 +88,23 @@ impl Controller {
         &mut self,
         tcp_stream: TcpStream,
         application: Arc<Mutex<Application>>,
+        end_tx: Sender<bool>,
     ) -> JoinHandle<()> {
         thread::spawn(move || {
-            let mut tcp_reader = BufReader::new(&tcp_stream);
             loop {
-                let message = message_read::res_read(BufReader::new(&tcp_stream));
-                application.lock().unwrap().receive(message);
+                let message = message_reader::res_read(BufReader::new(&tcp_stream));
+                if message.eq(&Message::new()) {
+                    // Disconnect
+                    info!("disconnect");
+                    tcp_stream
+                        .shutdown(Shutdown::Both)
+                        .expect("shutdown call failed");
+                    break;
+                } else {
+                    application.lock().unwrap().receive(message);
+                }
             }
+            let _ = end_tx.send(true);
         })
     }
 
@@ -148,8 +167,8 @@ impl Application {
     }
 
     fn receive(&mut self, message: Message) {
-        info!("{:?}", message.to_debug_string());
-        let seq_num = message.get(FieldKey::msg_seq_num()).unwrap();
+        info!("receive: {:?}", message.to_debug_string());
+        let seq_num = message.get(*MSG_SEQ_NUM).unwrap();
         self.seq_num_target += 1;
         if !seq_num.data.eq(&self.seq_num_target.to_string()) {
             debug!("target seq num is wrog");
@@ -167,19 +186,10 @@ impl Application {
 
     fn to_send_message(&mut self, mut message: Message) -> Message {
         self.seq_num_sender = self.seq_num_sender + 1;
-        message.add(Field::new(
-            FieldKey::msg_seq_num(),
-            self.seq_num_sender.to_string(),
-        ));
+        message.add(Field::new(*MSG_SEQ_NUM, self.seq_num_sender.to_string()));
 
-        message.add(Field::new(
-            FieldKey::sender_cmp_id(),
-            self.sender_comp_id.to_string(),
-        ));
-        message.add(Field::new(
-            FieldKey::target_cmp_id(),
-            self.target_comp_id.to_string(),
-        ));
+        message.add(Field::new(*SENDER_CMP_ID, self.sender_comp_id.to_string()));
+        message.add(Field::new(*TARGET_CMP_ID, self.target_comp_id.to_string()));
         message
     }
 }

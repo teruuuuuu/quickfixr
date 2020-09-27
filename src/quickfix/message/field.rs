@@ -29,7 +29,9 @@ impl Field {
 
 #[test]
 fn test_message() {
-    let field1 = Field::new(FieldKey::msg_type(), String::from("A"));
+    use crate::quickfix::message::field_key::MSG_TYPE;
+
+    let field1 = Field::new(*MSG_TYPE, String::from("A"));
     println!("{:?}", field1.to_string());
     assert_eq!(5, field1.length());
 }
